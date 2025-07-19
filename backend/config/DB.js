@@ -5,7 +5,11 @@ dotenv.config(); // Load environment variables from .env
 
 const connectDb = async () => {
   try {
-    const res = await mongoose.connect(process.env.DB_URL);
+    const res = await mongoose.connect(process.env.DB_URL, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
     if (res) {
       console.log("✅ DB Connected Successfully!");
     }
