@@ -40,9 +40,12 @@ app.use("/api/status", (req, res) => {
 
 app.use("/api/auth", userRoute);
 app.use("/api/messages", MessageRouter);
+if (process.env.NODE_ENV !== "production") {
+  const PORT = process.env.PORT;
+  server.listen(PORT, () => {
+    connectDb();
+    console.log(`The server is run on this PORT ${PORT}`);
+  });
+}
 
-const PORT = process.env.PORT;
-server.listen(PORT, () => {
-  connectDb();
-  console.log(`The server is run on this PORT ${PORT}`);
-});
+export default server;
