@@ -1,20 +1,29 @@
-import { generateToken } from "../config/utits.js";
-import User from "../models/user.js";
 import bcrypt from "bcryptjs";
+import User from "../models/user.js";
+import generateToken from "../config/utits.js";
 import cloudinary from "../config/cloudinary.js";
+
+// ✅ SignUp Controller
 export const signup = async (req, res) => {
   const { fullName, email, password, bio } = req.body;
 
   try {
     if (!fullName || !email || !password) {
-      return res.json({ success: false, message: "Missig Details" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing details" });
     }
-    const user = await User.findOne({ email });
-    if (user) {
-      return res.json({ success: false, message: "Account already exists" });
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res
+        .status(409)
+        .json({ success: false, message: "Account already exists" });
     }
+
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+
     const newUser = await User.create({
       fullName,
       email,
@@ -23,71 +32,87 @@ export const signup = async (req, res) => {
     });
 
     const token = generateToken(newUser._id);
-    res.json({
+    const { password: _, ...userWithoutPassword } = newUser._doc;
+
+    res.status(201).json({
       success: true,
-      userData: newUser,
+      userData: userWithoutPassword,
       token,
       message: "Account created successfully",
     });
   } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
+    console.error(error.message);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
-export const Login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
+// ✅ Login Controller
+export const login = async (req, res) => {
+  const { email, password } = req.body;
 
-    // Check if user exists
+  try {
     const userData = await User.findOne({ email });
     if (!userData) {
-      return res.json({ success: false, message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
-    // Compare passwords
     const isPasswordCorrect = await bcrypt.compare(password, userData.password);
     if (!isPasswordCorrect) {
-      return res.json({ success: false, message: "Invalid credentials" });
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid credentials" });
     }
 
-    // Generate token and send response
     const token = generateToken(userData._id);
-    res.json({
+    const { password: _, ...userWithoutPassword } = userData._doc;
+
+    res.status(200).json({
       success: true,
-      userData,
+      userData: userWithoutPassword,
       token,
       message: "Login successful",
     });
   } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
+    console.error(error.message);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
 
+// ✅ Check Auth Controller
 export const checkAuth = (req, res) => {
-  res.json({ success: true, user: req.user });
+  res.status(200).json({ success: true, user: req.user });
 };
 
+// ✅ Update Profile Controller
 export const updateProfile = async (req, res) => {
   try {
     const { profilePic, bio, fullName } = req.body;
     const userId = req.user._id;
+
     let updatedUser;
+
     if (!profilePic) {
-      await User.findByIdAndUpdate(userId, { bio, fullName }, { new: true });
+      updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { bio, fullName },
+        { new: true }
+      );
     } else {
       const upload = await cloudinary.uploader.upload(profilePic);
-
       updatedUser = await User.findByIdAndUpdate(
         userId,
         { profilePic: upload.secure_url, bio, fullName },
         { new: true }
       );
     }
-    res.json({ success: true, user: updatedUser });
+
+    const { password: _, ...userWithoutPassword } = updatedUser._doc;
+
+    res.status(200).json({ success: true, user: userWithoutPassword });
   } catch (error) {
-    console.log(error.message);
-    res.json({ success: false, message: error.message });
+    console.error(error.message);
+    res.status(500).json({ success: false, message: "Server error" });
   }
 };
